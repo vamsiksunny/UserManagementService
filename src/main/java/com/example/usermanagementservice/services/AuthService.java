@@ -9,6 +9,7 @@ import com.example.usermanagementservice.models.User;
 import com.example.usermanagementservice.repo.RoleRepository;
 import com.example.usermanagementservice.repo.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
@@ -22,6 +23,9 @@ public class AuthService implements IAuthService {
     @Autowired
     private RoleRepository roleRepository;
 
+    @Autowired
+    private BCryptPasswordEncoder bCryptPasswordEncoder;
+
     @Override
     public User signup(String name, String email, String password) {
         Optional<User> userOptional = userRepository.findByEmail(email);
@@ -33,7 +37,7 @@ public class AuthService implements IAuthService {
         User user = new User();
         user.setEmail(email);
         user.setName(name);
-        user.setPassword(password); // TODO : to be encoded
+        user.setPassword(bCryptPasswordEncoder.encode(password));
         user.setState(State.ACTIVE);
         user.setCreatedAt(new Date());
 
@@ -64,7 +68,7 @@ public class AuthService implements IAuthService {
         }
 
         User user = userOptional.get();
-        if (!password.equals(user.getPassword())) {
+        if (!bCryptPasswordEncoder.matches(password, user.getPassword())) {
             throw new PasswordMismatchException("Please enter correct password");
         }
         // JWT token generation
