@@ -8,12 +8,16 @@ import com.example.usermanagementservice.models.State;
 import com.example.usermanagementservice.models.User;
 import com.example.usermanagementservice.repo.RoleRepository;
 import com.example.usermanagementservice.repo.UserRepository;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.security.MacAlgorithm;
+import org.antlr.v4.runtime.misc.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.Optional;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 @Service
 public class AuthService implements IAuthService {
@@ -60,7 +64,7 @@ public class AuthService implements IAuthService {
     }
 
     @Override
-    public User login(String email, String password) {
+    public Pair<User, String> login(String email, String password) {
         Optional<User> userOptional = userRepository.findByEmail(email);
 
         if (userOptional.isEmpty()) {
@@ -72,6 +76,23 @@ public class AuthService implements IAuthService {
             throw new PasswordMismatchException("Please enter correct password");
         }
         // JWT token generation
-        return user;
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("userId", user.getId());
+        List<String> roles = new ArrayList<>();
+        for (Role role : user.getRoles()) {
+            roles.add(role.getValue());
+        }
+        claims.put("access", roles);
+        Long currentTime = System.currentTimeMillis();
+        claims.put("iat", currentTime);
+        claims.put("expiry", currentTime + 100000);
+        claims.put("issuer", "facebook");
+
+        MacAlgorithm algo = Jwts.SIG.HS256;
+        SecretKey secretKey = algo.key().build();
+
+        String token = Jwts.builder().claims(claims).signWith(secretKey).compact();
+
+        return new Pair<>(user, token);
     }
 }

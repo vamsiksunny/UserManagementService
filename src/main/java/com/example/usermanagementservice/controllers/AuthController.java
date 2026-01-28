@@ -7,9 +7,13 @@ import com.example.usermanagementservice.dto.UserDto;
 import com.example.usermanagementservice.models.Role;
 import com.example.usermanagementservice.models.User;
 import com.example.usermanagementservice.services.IAuthService;
+import org.antlr.v4.runtime.misc.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -43,11 +47,15 @@ public class AuthController {
     // we are using ResponseEntity because we need to pass jwt token in headers of response
     @PostMapping("login")
     public ResponseEntity<UserDto> login(@RequestBody LoginRequestDto loginRequestDto) {
-        User user = authService.login(
+        Pair<User, String> userTokenPair = authService.login(
                 loginRequestDto.getEmail(),
                 loginRequestDto.getPassword());
-        UserDto userDto = from(user);
-        return new ResponseEntity<>(userDto, HttpStatus.OK);
+        String token = userTokenPair.b;
+        UserDto userDto = from(userTokenPair.a);
+
+        MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
+        headers.add(HttpHeaders.SET_COOKIE, token);
+        return new ResponseEntity<>(userDto, headers, HttpStatus.OK);
     }
 
     private UserDto from(User user) {
