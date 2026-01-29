@@ -1,13 +1,15 @@
 package com.example.usermanagementservice.services;
 
-import com.example.usermanagementservice.exceptions.PasswordMismatchException;
-import com.example.usermanagementservice.exceptions.UserAlreadyExistingException;
-import com.example.usermanagementservice.exceptions.UserNotRegisteredException;
+import com.example.usermanagementservice.exceptions.*;
 import com.example.usermanagementservice.models.Role;
+import com.example.usermanagementservice.models.Session;
 import com.example.usermanagementservice.models.State;
 import com.example.usermanagementservice.models.User;
 import com.example.usermanagementservice.repo.RoleRepository;
+import com.example.usermanagementservice.repo.SessionRepository;
 import com.example.usermanagementservice.repo.UserRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.MacAlgorithm;
 import org.antlr.v4.runtime.misc.Pair;
@@ -16,7 +18,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 @Service
@@ -26,6 +27,11 @@ public class AuthService implements IAuthService {
     private UserRepository userRepository;
     @Autowired
     private RoleRepository roleRepository;
+    @Autowired
+    private SessionRepository sessionRepository;
+
+    @Autowired
+    private SecretKey secretKey;
 
     @Autowired
     private BCryptPasswordEncoder bCryptPasswordEncoder;
@@ -88,11 +94,44 @@ public class AuthService implements IAuthService {
         claims.put("expiry", currentTime + 100000);
         claims.put("issuer", "facebook");
 
-        MacAlgorithm algo = Jwts.SIG.HS256;
-        SecretKey secretKey = algo.key().build();
-
         String token = Jwts.builder().claims(claims).signWith(secretKey).compact();
+
+        Session session = new Session();
+        session.setUser(user);
+        session.setToken(token);
+        session.setState(State.ACTIVE);
+        session.setCreatedAt(new Date());
+        sessionRepository.save(session);
 
         return new Pair<>(user, token);
     }
+
+    // check if token is expired or not --> JWT parser
+    @Override
+    public void validateToken(String token) {
+        Optional<Session> sessionOptional = sessionRepository.findByToken(token);
+
+        if (sessionOptional.isEmpty()) {
+            throw new InvalidTokenException("Please login");
+        }
+
+        // check for expiry
+        Session session = sessionOptional.get();
+        JwtParser jwtParser = Jwts.parser().verifyWith(secretKey).build();
+
+        Claims claims = jwtParser.parseSignedClaims(token).getPayload();
+
+        Long expiry = (Long)claims.get("expiry");
+        long currentTime = System.currentTimeMillis();
+        System.out.println("expiry " + expiry);
+        System.out.println("current Time " + currentTime);
+
+        if(currentTime > expiry) {
+            session.setState(State.INACTIVE);
+            session.setLastUpdatedAt(new Date());
+            sessionRepository.save(session);
+            throw new TokenExpiredException("Please login again, token has expired");
+        }
+    }
+
 }

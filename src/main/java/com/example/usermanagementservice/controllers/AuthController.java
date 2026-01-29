@@ -1,9 +1,6 @@
 package com.example.usermanagementservice.controllers;
 
-import com.example.usermanagementservice.dto.LoginRequestDto;
-import com.example.usermanagementservice.dto.RoleDto;
-import com.example.usermanagementservice.dto.SignUpRequestDto;
-import com.example.usermanagementservice.dto.UserDto;
+import com.example.usermanagementservice.dto.*;
 import com.example.usermanagementservice.models.Role;
 import com.example.usermanagementservice.models.User;
 import com.example.usermanagementservice.services.IAuthService;
@@ -56,6 +53,11 @@ public class AuthController {
         MultiValueMap<String, String> headers = new LinkedMultiValueMap<>();
         headers.add(HttpHeaders.SET_COOKIE, token);
         return new ResponseEntity<>(userDto, headers, HttpStatus.OK);
+    }
+
+    @PostMapping("/validateToken")
+    public void validToken(@RequestBody ValidateTokenDto validateTokenDto) {
+        authService.validateToken(validateTokenDto.getToken());
     }
 
     private UserDto from(User user) {

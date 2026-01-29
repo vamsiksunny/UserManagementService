@@ -9,4 +9,6 @@ public interface IAuthService {
 
     Pair<User, String> login(String email, String password);
 
+    void validateToken(String token);
+
 }
