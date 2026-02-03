@@ -1,5 +1,7 @@
 package com.example.usermanagementservice.services;
 
+import com.example.usermanagementservice.clients.KafkaClient;
+import com.example.usermanagementservice.dto.EmailDto;
 import com.example.usermanagementservice.exceptions.*;
 import com.example.usermanagementservice.models.Role;
 import com.example.usermanagementservice.models.Session;
@@ -8,10 +10,11 @@ import com.example.usermanagementservice.models.User;
 import com.example.usermanagementservice.repo.RoleRepository;
 import com.example.usermanagementservice.repo.SessionRepository;
 import com.example.usermanagementservice.repo.UserRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.security.MacAlgorithm;
 import org.antlr.v4.runtime.misc.Pair;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -29,6 +32,10 @@ public class AuthService implements IAuthService {
     private RoleRepository roleRepository;
     @Autowired
     private SessionRepository sessionRepository;
+    @Autowired
+    KafkaClient kafkaClient;
+    @Autowired
+    ObjectMapper objectMapper;
 
     @Autowired
     private SecretKey secretKey;
@@ -66,7 +73,19 @@ public class AuthService implements IAuthService {
 
         user.getRoles().add(role);
 
-        return userRepository.save(user);
+        // produce in Kafka
+        EmailDto emailDto = new EmailDto();
+        emailDto.setSubject("Welcome");
+        emailDto.setBody("Have a great day!!!");
+        emailDto.setTo(user.getEmail());
+        emailDto.setFrom("vamsikOnHiring@gmail.com");
+
+        try {
+            kafkaClient.sendMessage("signup", objectMapper.writeValueAsString(emailDto));
+            return userRepository.save(user);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     @Override
